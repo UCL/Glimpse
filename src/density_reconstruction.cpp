@@ -311,6 +311,9 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
     double old_tk = 1.0;
     double tk;
 
+    // single stepping
+    niter = 1;
+
     for (long iter = 0; iter < niter; iter++) {
         std::cout << "Iteration : " << iter << std::endl;
 
