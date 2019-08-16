@@ -398,7 +398,8 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
           alpha_tmp[ind] = alpha_u[ind] + sig * alpha_tmp[ind];
         }
 
-        // Read in the single stepping data. Assume alpha is correct
+        // Read in the single stepping data. Re-ingest alpha, as some arrays are not initialized
+        read_float_data(std::string("alpha_i") + dot_ext, alpha_tmp, nwavcoeff);
         float* h_u = new float[nwavcoeff];
         read_float_data(std::string("u_i") + dot_ext, h_u, nwavcoeff);
 
