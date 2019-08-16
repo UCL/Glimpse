@@ -32,12 +32,15 @@
  *
  */
 #include <iostream>
+#include <fstream>
 #include <cmath>
 #ifdef DEBUG_FITS
 #include <sparse2d/IM_IO.h>
 #endif
 
 #include "density_reconstruction.h"
+
+void read_float_data(char *filename, float *array, int size);
 
 using namespace std;
 
@@ -339,13 +342,34 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
                 alpha_tmp[ind] = delta_tmp[ind][0] * fftFactor;
             }
 
+        // Read the 'before' data files for the positivity step
+        read_float_data("delta_i.dat", alpha_tmp, ncoeff);
+        float* h_u_pos = new float[npix * npix * nlp];
+        read_float_data("upos_i.data", h_u_pos, npix * npix * nlp);
+
 #ifdef CUDA_ACC
-            prox->prox_pos(alpha_tmp, 10000, iter == niter/2);
+        prox->inject_u_pos(h_u_pos);
+        prox->prox_pos(alpha_tmp, 10000, true);
+        prox->extract_u_pos(h_u_pos);
+
 #else
 
 #endif
-            #pragma omp parallel for
-            for (long ind = 0; ind < ncoeff; ind++) {
+        // Compare to the captured output data
+        float* alpha_after = new float[ncoeff];
+        read_float_data("delta_o.dat", alpha_after, ncoeff);
+        float* u_pos_after = new float[npix * npix * nlp];
+        read_float_data("upos_o.dat", u_pos_after, npix * npix * nlp);
+
+       // compare_pos_data(alpha_tmp, alpha_after, h_u_pos, u_pos_after);
+
+        delete[] h_u_pos;
+        delete[] alpha_after;
+        delete[] u_pos_after;
+
+
+        #pragma omp parallel for
+        for (long ind = 0; ind < ncoeff; ind++) {
                 delta_tmp[ind][0] = delta_tmp[ind][0] * fftFactor - alpha_tmp[ind];
                 delta_tmp[ind][1] = 0;
             }
@@ -708,4 +732,13 @@ void density_reconstruction::get_density_map(double *d)
 
         }
     }
+}
+
+// Read size float values from filename into array
+void read_float_data(char *filename, float *array, int size)
+{
+    std::ifstream instream;
+    instream.open(filename, std::ios_base::binary | std::ios_base::in);
+    instream.read(reinterpret_cast<char*> (array), size * sizeof(float));
+    instream.close();
 }

@@ -91,6 +91,8 @@ public:
      */
     void update_weights(float *l1_weights);
     
+    void inject_u_pos(float *h_u_pos);
+    void extract_u_pos(float *h_u_pos);
 
 private:
     void write_config_file();

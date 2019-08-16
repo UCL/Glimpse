@@ -168,7 +168,7 @@ void spg::prox_pos ( float *delta, int niter, bool do_output )
     }
 
     if (do_output && CAPTURE_OUTPUT) {
-        write_pos_data("i");
+        write_pos_data("w");
     }
 
     for ( int i = 0; i < nGPU; i++ ) {
@@ -193,7 +193,7 @@ void spg::prox_pos ( float *delta, int niter, bool do_output )
     }
 
     if (do_output && CAPTURE_OUTPUT) {
-        write_pos_data("o");
+        write_pos_data("c");
     }
 
     for ( int i = 0; i < nGPU; i++ ) {
@@ -226,7 +226,7 @@ void spg::prox_l1 ( float *alpha, int niter, bool do_output )
     }
 
     if (do_output && CAPTURE_OUTPUT) {
-        write_l1_data("i");
+        write_l1_data("w");
     }
 
     for ( int i = 0; i < nGPU; i++ ) {
@@ -258,7 +258,7 @@ void spg::prox_l1 ( float *alpha, int niter, bool do_output )
     }
 
     if (do_output && CAPTURE_OUTPUT) {
-        write_l1_data("o");
+        write_l1_data("c");
     }
 
     sdkStopTimer ( &timer );
@@ -278,6 +278,26 @@ void spg::update_weights ( float *l1_weights )
         checkCudaErrors ( cudaSetDevice ( whichGPUs[i] ) );
         checkCudaErrors ( cudaDeviceSynchronize() );
     }
+}
+
+void spg::inject_u_pos ( float *h_u_pos )
+{
+    checkCudaErrors ( cudaMemcpy2DAsync (
+            d_u_pos[0], coeff_stride_pos[0] * sizeof(float),
+            h_u_pos, npix * npix * sizeof(float),
+            coeff_stride_pos[0] * sizeof(float), nz,
+            cudaMemcpyHostToDevice
+            ) );
+}
+
+void spg::extract_u_pos( float *h_u_pos )
+{
+    checkCudaErrors ( cudaMemcpy2D (
+        h_u_pos, npix * npix * sizeof(float),
+        d_u_pos[0], coeff_stride_pos[0] * sizeof(float),
+        coeff_stride_pos[0] * sizeof(float), nz,
+        cudaMemcpyDeviceToHost
+        ) );
 }
 
 void spg::write_config_file( )
