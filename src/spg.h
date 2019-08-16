@@ -94,6 +94,9 @@ public:
     void inject_u_pos(float *h_u_pos);
     void extract_u_pos(float *h_u_pos);
 
+    void inject_u(float *h_u);
+    void extract_u(float *h_u);
+
 private:
     void write_config_file();
     void write_p_pp();
