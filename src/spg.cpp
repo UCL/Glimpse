@@ -300,6 +300,26 @@ void spg::extract_u_pos( float *h_u_pos )
         ) );
 }
 
+void spg::inject_u( float *h_u )
+{
+    checkCudaErrors ( cudaMemcpy2DAsync (
+            d_u[0], coeff_stride[0] * sizeof(float),
+            h_u, npix * npix * nframes * sizeof(float),
+            coeff_stride[0] * sizeof(float), nz,
+            cudaMemcpyHostToDevice
+            ) );
+}
+
+void spg::extract_u( float *h_u )
+{
+    checkCudaErrors ( cudaMemcpy2D (
+        h_u, npix * npix * nframes * sizeof(float),
+        d_u[0], coeff_stride[0] * sizeof(float),
+        coeff_stride[0] * sizeof(float), nz,
+        cudaMemcpyDeviceToHost
+        ) );
+}
+
 void spg::write_config_file( )
 {
     std::ofstream cfgstream;

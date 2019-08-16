@@ -316,6 +316,7 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
 
     // single stepping
     niter = 1;
+    std::string dot_ext = ".dat";
 
     for (long iter = 0; iter < niter; iter++) {
         std::cout << "Iteration : " << iter << std::endl;
@@ -343,7 +344,6 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
             }
 
             // Read the 'before' data files for the positivity step
-            std::string dot_ext = ".dat";
             read_float_data(std::string("delta_i") + dot_ext, alpha_tmp, ncoeff);
             float* h_u_pos = new float[npix * npix * nlp];
             read_float_data(std::string("upos_i") + dot_ext, h_u_pos, npix * npix * nlp);
@@ -398,8 +398,14 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
           alpha_tmp[ind] = alpha_u[ind] + sig * alpha_tmp[ind];
         }
 
+        // Read in the single stepping data. Assume alpha is correct
+        float* h_u = new float[nwavcoeff];
+        read_float_data(std::string("u_i") + dot_ext, h_u, nwavcoeff);
+
 #ifdef CUDA_ACC
+        prox->inject_u(h_u);
         prox->prox_l1(alpha_tmp,1000, iter == niter/2);
+        prox->extract_u(h_u);
 #else
         // TODO: Implement CPU prox operator
 #endif
