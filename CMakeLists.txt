@@ -72,6 +72,7 @@ link_directories(${SPARSE2D_LIBRARY_DIR}
 		    ${CCFITS_LIBRARY_DIR}
 		    ${CFITSIO_LIBRARY_DIR}
 		    ${Boost_LIBRARY_DIR}
+		    ${LIBOMP_LIBRARY_DIR}
 		    ${NICAEA_LIBRARY_DIR}
 		    ${NFFT_LIBRARY_DIR}
 		    ${FFTW_LIBRARY_DIR})
@@ -181,4 +182,23 @@ if(BUILD_TESTING)
 
   add_test( test_field_test test_field )
   set_tests_properties(test_field_test PROPERTIES WILL_FAIL TRUE)
+  
+  add_executable(test_small test/test_small.cpp
+  src/glimpse.cpp
+  ${GLIMPSE_SRC}
+  )
+  target_link_libraries(test_small
+    ${NICAEA_LIBRARIES}
+    ${SPARSE2D_LIBRARIES}
+    ${Boost_LIBRARIES}
+    ${GSL_LIBRARIES}
+    ${NFFT_LIBRARIES}
+    ${FFTW_LIBRARIES}
+    ${CCFITS_LIBRARY}
+    ${CFITSIO_LIBRARY}
+    ${ARMADILLO_LIBRARIES}
+    Catch2::Catch2)
+  
+  add_test(test_small_test test_small)
+  
 endif()
