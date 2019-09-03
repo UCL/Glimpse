@@ -9,6 +9,9 @@
 #include <catch2/catch.hpp>
 
 #include <iostream>
+#include <memory>
+
+#include <CCfits/CCfits>
 
 #include "../src/glimpse.h"
 
@@ -18,9 +21,11 @@
   bool dbf = false;
 #endif
 
-  void small_test() {
+void read_fits_result(char* filename, std::valarray<unsigned long>& contents);
 
-  std::cout << "DEBUG_FITS = " << dbf << std::endl;
+void small_test() {
+
+    std::cout << "DEBUG_FITS = " << dbf << std::endl;
 }
 
 TEST_CASE( "Test verbosity", "[verbosity]") {
@@ -30,17 +35,37 @@ TEST_CASE( "Test verbosity", "[verbosity]") {
 
 TEST_CASE( "Reduced resolution", "[example]") {
     int argc = 6;
+
+    char* out_file = "delta_test.fits";
+    char* ref_file = "data/delta_ref.fits";
     char* argv[] = {"glimpse",
             "-g",
             "0",
-            "../example/reduced_resolution/config3d.ini",
-            "../example/reduced_resolution/cat_3_1.fits",
-            "delta.fits"};
+            "data/config3d.ini",
+            "data/cat_3_1.fits",
+            out_file};
 
     boost::property_tree::ptree pt;
     po::variables_map vm;
 
-    REQUIRE(create_config(argc, argv, pt, vm) == 0);
+    REQUIRE(create_config(argc, argv, pt, vm) == config_ok_go);
 
+    REQUIRE(configure_and_run(pt, vm) == return_ok);
+
+    // Read the output and reference FITS file
+    std::valarray<unsigned long> output_contents;
+    read_fits_result(out_file, output_contents);
+    std::valarray<unsigned long> reference_contents;
+    read_fits_result(ref_file, reference_contents);
+
+    REQUIRE(reference_contents[0] == output_contents[0]);
+}
+
+void read_fits_result(char* filename, std::valarray<unsigned long>& contents) {
+    std::unique_ptr<CCfits::FITS> pInfile(new CCfits::FITS(filename, CCfits::Read, true));
+    CCfits::PHDU& image = pInfile->pHDU();
+    image.readAllKeys();
+    image.read(contents);
+    pInfile->close();
 
 }
