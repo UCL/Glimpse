@@ -66,6 +66,6 @@ void read_fits_result(char* filename, std::valarray<unsigned long>& contents) {
     CCfits::PHDU& image = pInfile->pHDU();
     image.readAllKeys();
     image.read(contents);
-    pInfile->close();
+    pInfile->destroy();
 
 }
