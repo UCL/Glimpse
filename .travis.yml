@@ -77,3 +77,9 @@ script:
   - make VERBOSE=1
   - ./glimpse --version
   - make test
+
+# Blocklist
+branches:
+  except:
+  - singlestepcpu
+  
