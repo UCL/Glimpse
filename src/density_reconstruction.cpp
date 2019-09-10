@@ -360,6 +360,10 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
                 delta_tmp_f[i][1] = 0.;
             }
             wav->transform(delta_tmp_f, alpha_prox);
+            wav->trans_adjoint(alpha_tmp, delta_tmp_f);
+            analysis_prox(delta_tmp_f);
+            wav->transform(delta_tmp_f, alpha_tmp);
+            wav->trans_adjoint(alpha_prox, delta_tmp_f);
 #endif
         // Compare to the captured output data
             float* alpha_after = new float[ncoeff];
