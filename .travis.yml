@@ -78,3 +78,9 @@ script:
   - ./glimpse --version
   - ./test_wavelet_transform
   # - ./test_field
+
+# Blocklist
+branches:
+  except:
+  - singlestepcpu
+  
