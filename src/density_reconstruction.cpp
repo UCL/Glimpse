@@ -354,7 +354,12 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
             prox->extract_u_pos(h_u_pos);
 
 #else
-
+            // The adjoint wavelet transform of alpha_prox plays the same role as h_u_pos
+            for (long i = 0; i < ncoeff; i++) {
+                delta_tmp_f[i][0] = h_u_pos[i];
+                delta_tmp_f[i][1] = 0.;
+            }
+            wav->transform(delta_tmp_f, alpha_prox);
 #endif
         // Compare to the captured output data
             float* alpha_after = new float[ncoeff];
