@@ -359,10 +359,21 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
                 delta_tmp_f[i][0] = h_u_pos[i];
                 delta_tmp_f[i][1] = 0.;
             }
+            // The u array is passed as a set of coefficients (alpha_prox),
+            // rather than as a field of size ncoeff
             wav->transform(delta_tmp_f, alpha_prox);
-            wav->trans_adjoint(alpha_tmp, delta_tmp_f);
+            // The mass array is contained in alpha_temp, but is in fact only ncoeff long
+            for (long i = 0; i < ncoeff; i++) {
+                delta_tmp_f[i][0] = alpha_tmp[i][0];
+                delta_tmp_f[i][1] = 0.;
+            }
+            // Run the CPU pos proxy
             analysis_prox(delta_tmp_f);
-            wav->transform(delta_tmp_f, alpha_tmp);
+            // Copy the data back into alpha_tmp
+            for (long i = 0; i < ncoeff; i++) {
+                alpha_tmp[i] = delta_tmp_f[i][0];
+            }
+            // Convert alpha_prox back from components to density
             wav->trans_adjoint(alpha_prox, delta_tmp_f);
 #endif
         // Compare to the captured output data
