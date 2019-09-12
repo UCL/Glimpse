@@ -366,7 +366,7 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
             wav->transform(delta_tmp_f, alpha_prox);
             // The mass array is contained in alpha_temp, but is in fact only ncoeff long
             for (long i = 0; i < ncoeff; i++) {
-                delta_tmp_f[i][0] = alpha_tmp[i][0];
+                delta_tmp_f[i][0] = alpha_tmp[i];
                 delta_tmp_f[i][1] = 0.;
             }
             // Run the CPU pos proxy
