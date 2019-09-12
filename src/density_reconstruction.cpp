@@ -353,6 +353,7 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
             prox->inject_u_pos(h_u_pos);
             prox->prox_pos(alpha_tmp, 10000, true);
             prox->extract_u_pos(h_u_pos);
+            std::cout << "Solving positivity with CUDA" << std::endl;
 
 #else
             // The adjoint wavelet transform of alpha_prox plays the same role as h_u_pos
@@ -380,6 +381,8 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
             for (long i = 0; i < ncoeff; i++) {
                 h_u_pos[i] = delta_tmp_f[i][0];
             }
+
+            std::cout << "Solving positivity on the CPU" << std::endl;
 #endif
         // Compare to the captured output data
             float* alpha_after = new float[ncoeff];
