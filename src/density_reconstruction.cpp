@@ -41,6 +41,7 @@
 #include "density_reconstruction.h"
 
 void read_float_data(std::string filename, float *array, int size);
+void write_float_data(std::string filename, float *array, int size);
 
 using namespace std;
 
@@ -373,8 +374,12 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
             for (long i = 0; i < ncoeff; i++) {
                 alpha_tmp[i] = delta_tmp_f[i][0];
             }
+            write_float_data("delta_c.dat", alpha_tmp, ncoeff);
             // Convert alpha_prox back from components to density
             wav->trans_adjoint(alpha_prox, delta_tmp_f);
+            for (long i = 0; i < ncoeff; i++) {
+                h_u_pos[i] = delta_tmp_f[i][0];
+            }
 #endif
         // Compare to the captured output data
             float* alpha_after = new float[ncoeff];
@@ -769,4 +774,12 @@ void read_float_data(std::string filename, float *array, int size)
     instream.open(filename, std::ios_base::binary | std::ios_base::in);
     instream.read(reinterpret_cast<char*> (array), size * sizeof(float));
     instream.close();
+}
+
+void write_float_data(std::string filename, float *array, int size)
+{
+    std::ofstream outstream;
+    outstream.open(filename, std::ios_base::binary | std::ios_base::out);
+    outstream.write(reinterpret_cast<char*> (array), size* sizeof(float));
+    outstream.close();
 }
