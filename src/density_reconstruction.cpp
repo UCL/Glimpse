@@ -349,7 +349,7 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
             float* h_u_pos = new float[npix * npix * nlp];
             read_float_data(std::string("upos_i") + dot_ext, h_u_pos, npix * npix * nlp);
 
-#ifdef CUDA_ACC
+#ifdef CUDA_ACC && false
             prox->inject_u_pos(h_u_pos);
             prox->prox_pos(alpha_tmp, 10000, true);
             prox->extract_u_pos(h_u_pos);
