@@ -198,6 +198,10 @@ if(BUILD_TESTING)
     ${CFITSIO_LIBRARY}
     ${ARMADILLO_LIBRARIES}
     Catch2::Catch2)
+
+  add_dependencies(test_small NICAEA
+    SPARSE2D)
+    
   
   add_test(test_small_test test_small)
   
