@@ -21,7 +21,7 @@
   bool dbf = false;
 #endif
 
-void read_fits_result(char* filename, std::valarray<unsigned long>& contents);
+void read_fits_result(char* filename, std::valarray<float>& contents);
 
 void small_test() {
 
@@ -53,15 +53,15 @@ TEST_CASE( "Reduced resolution", "[example]") {
     REQUIRE(configure_and_run(pt, vm) == return_ok);
 
     // Read the output and reference FITS file
-    std::valarray<unsigned long> output_contents;
+    std::valarray<float> output_contents;
     read_fits_result(out_file, output_contents);
-    std::valarray<unsigned long> reference_contents;
+    std::valarray<float> reference_contents;
     read_fits_result(ref_file, reference_contents);
 
     REQUIRE(reference_contents[0] == output_contents[0]);
 }
 
-void read_fits_result(char* filename, std::valarray<unsigned long>& contents) {
+void read_fits_result(char* filename, std::valarray<float>& contents) {
     std::unique_ptr<CCfits::FITS> pInfile(new CCfits::FITS(filename, CCfits::Read, true));
     CCfits::PHDU& image = pInfile->pHDU();
     image.readAllKeys();
