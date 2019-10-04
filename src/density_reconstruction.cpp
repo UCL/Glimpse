@@ -41,6 +41,7 @@
 #include "density_reconstruction.h"
 
 void read_float_data(std::string filename, float *array, int size);
+void write_float_data(std::string filename, float *array, int size)
 
 using namespace std;
 
@@ -348,6 +349,12 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
             float* h_u_pos = new float[npix * npix * nlp];
             read_float_data(std::string("upos_i") + dot_ext, h_u_pos, npix * npix * nlp);
 
+            // Copies of the input data
+            float *alpha_tmp_cpu = new float[nwavcoeff];
+            std::memcpy(alpha_tmp_cpu, alpha_tmp, sizeof(float)*nwavcoeff);
+            float *u_pos_cpu = new float[ncoeff];
+            std::memcpy(u_pos_cpu, h_u_pos, sizeof(float)*ncoeff);
+
 #ifdef CUDA_ACC
             prox->inject_u_pos(h_u_pos);
             prox->prox_pos(alpha_tmp, 10000, true);
@@ -356,6 +363,13 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
 #else
 
 #endif
+            // Run the CPU kernel
+            // Not yet!
+
+            // Output the data from the CPU kernel
+            write_float_data(std::string("delta_cpu_o") + dot_ext, alpha_tmp_cpu, ncoeff);
+            write_float_data(std::string("u_pos_cpu_o") + dot_ext, u_pos_cpu, ncoeff);
+
         // Compare to the captured output data
             float* alpha_after = new float[ncoeff];
             read_float_data(std::string("delta_o") + dot_ext, alpha_after, ncoeff);
@@ -749,4 +763,12 @@ void read_float_data(std::string filename, float *array, int size)
     instream.open(filename, std::ios_base::binary | std::ios_base::in);
     instream.read(reinterpret_cast<char*> (array), size * sizeof(float));
     instream.close();
+}
+
+void write_float_data(std::string filename, float *array, int size)
+{
+    std:ofstream outstream;
+    outstream.open(filename, std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
+    outstream.write(reinterpret_cast<char*> (array), size * sizeof(float));
+    outstream.close();
 }
