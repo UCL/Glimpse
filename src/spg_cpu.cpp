@@ -41,11 +41,36 @@ spg_cpu::spg_cpu( int npix, int nz, int nframes, const double *P, const float *l
 npix ( npix ), nz ( nz ), nframes ( nframes )
 {
 
+    // Coefficient plurality
+    int ncoeff = npix * npix * nz;
+    int nwavcoeff = npix * npix * nframes * nz;
+
+    // Allocate arrays for the calculation variables, and zero the arrays
+    u = new float[nwavcoeff]();
+    u_pos = new float[ncoeff]();
+    w = new float[nwavcoeff]();
+
+    // Allocate arrays for and store the preconditioning matrix
+    pp = new float[nz*nz];
+    p = new float[nz*nz];
+
+    // Initialize the timer
+    timer = NULL;
+    sdkCreateTimer( &timer );
+    sdkResetTimer( &timer );
 }
 
 spg_cpu::~spg_cpu()
 {
+    // Free allocated arrays
+    delete[] u;
+    delete[] u_pos;
+    delete[] w;
 
+    delete[] pp;
+    delete[] p;
+
+    StopWatchInterface *timer;
 }
 
 void spg_cpu::prox_pos ( float *delta, int niter )
@@ -55,7 +80,7 @@ void spg_cpu::prox_pos ( float *delta, int niter )
 
 void spg_cpu::prox_l1 ( float *alpha, int niter )
 {
-
+// Do nothing
 }
 
 void spg_cpu::update_weights ( float *l1_weights )
