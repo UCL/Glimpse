@@ -75,6 +75,10 @@ spg_cpu::~spg_cpu()
 
 void spg_cpu::prox_pos ( float *delta, int niter )
 {
+    int ncoeff = npix * npix * nz;
+
+    float preconditioned[] = new float[ncoeff]();
+    // Multiply by the preconditioning matrix
 
 }
 
