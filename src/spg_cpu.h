@@ -39,6 +39,8 @@
 #ifndef SPG_CPU_H
 #define SPG_CPU_H
 
+#include "helper_timer.h"
+
 class spg_cpu
 {
     // Array dimensions
@@ -55,6 +57,8 @@ class spg_cpu
     // Pre-conditioning matrix
     float *p;
     float *pp;
+
+    StopWatchInterface *timer;
 
 public:
     /* Constructor
