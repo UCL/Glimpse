@@ -39,6 +39,9 @@
 
 #include "spg_cpu.h"
 
+void reduction(int nz, int nlos, float result[], float left_curr[], float left_old[], float right_curr[], float right_old[]);
+
+
 spg_cpu::spg_cpu( int npix, int nz, int nframes, const double *P, const float *l1_weights ) :
 npix ( npix ), nz ( nz ), nframes ( nframes ),
 nlos ( npix * npix ), ncoeff ( nlos * nz ), nwavcoeff ( ncoeff * nframes )
@@ -129,14 +132,34 @@ void spg_cpu::prox_pos ( float *delta, int niter )
         gg0[x] = std::sqrt(gg0[x]);
     }
 
-    iterate_prox_pos(niter, conditioned, u_pos, gg0);
+    iterate_prox_pos(niter, conditioned, u_pos, gg0, epsilon_0, epsilon);
+
+    // Compute transformation of the resulting array (spg.cu LL417—430)
+    for ( int z1 = 0; z1 < nz; z1++ ) {
+        for ( int x = 0; x < nlos; x++ ) {
+            int idx = z1 * nlos + x;
+            delta[idx] = 0.;
+            for ( int z2 = 0; z2 < nz; z2++ ) {
+                int idx2 = z2 * nlos + x;
+                if (u[idx2] < 0.) {
+                    delta[idx] += u[idx2] * p[z2 * nz + z1];
+                }
+            }
+        }
+    }
 }
 
-void spg_cpu::iterate_prox_pos(int niter, float px[], float u[], float gg0[]) {
+void spg_cpu::iterate_prox_pos(int niter, float px[], float u[], float gg0[], float epsilon_0, float epsilon) {
     float g[] = new float[ncoeff];
     float gold[] = new float[ncoeff];
 
     float uold[] = new float[ncoeff];
+
+    float gudiff[] = new float[ncoeff];
+    float sy[] = new float[nlos]();
+    float bb[] = new float[nlos]();
+
+    float optim[] = new float[ncoeff]();
 
     for ( int iter = 0; iter < niter; iter++){
         // Initialize the gradient with A^t x (spg.cu L304)
@@ -146,12 +169,81 @@ void spg_cpu::iterate_prox_pos(int niter, float px[], float u[], float gg0[]) {
 
         // Compute the matrix product which gives g[z] (spg.cu L314)
         for ( int z = 0; z < nz; z++ ) {
-
+            for ( int x = 0; x < nlos; x++ ) {
+                for ( int z1 = 0; z1 < nz; z1++) {
+                    g[z * nz + x] += pp[z1 * nz + z] * u[z1 * nlos + x];
+                }
+            }
         }
+
+        // Compute BB steps (spg.cu LL318—359)
+        if ( iter > 0 ) {
+            reduction(nz, nlos, sy, g, gold, u, uold);
+            if (iter % 2) {
+                reduction(nz, nlos, bb, g, gold, g, gold);
+                for ( int x = 0; x < nlos; x++ ) {
+                    bb[x] = (bb[x] == 0.) ? 0. : sy[x]/bb[x];
+                }
+            } else {
+                reduction(nz, nlos, bb, u, uold, u, uold);
+                for ( int x = 0; x < nlos; x++ ) {
+                    bb[x] = (sy[x] == 0.) ? 0. : bb[x]/sy[x];
+                }
+            }
+        }
+
+        // Compute optimality checks (spg.cu LL362—368) and reduce over redshift (LL373—376)
+        for ( int z  = 0; z < nz; z++ ) {
+            for ( int x = 0; x < nlos; x++ ) {
+                int idx = z * nlos + x;
+                if ( std::sqrt(gg0[x]) >= epsilon_0 ) {
+                    float vv = (u[x] == 0.) ? std::fmax(g[idx], 0.) : g[idx];
+                    optim[x] += vv * vv / gg0[x];
+                }
+            }
+        }
+        // spg.cu LL381—384
+        for ( int x = 0; x < nlos; x++ ) {
+            optim[x] = std::sqrt(optim[x]);
+        }
+
+        float eps_max = -std::numeric_limits<float>::infinity();
+        // Update variables only if optimality has not been achieved (spg.cu LL388-408)
+        // Loop over lines of sight
+        for ( int x = 0; x < nlos; x++ ) {
+            if (optim[x] > epsilon) {
+                // Prevent bb from increasing in magnitude without bound
+                bb[x] = ( std::fabs(bb[x]) > 1.0 ) ? 0.001 : bb[x];
+                // Update uold, gold
+                for ( int z = 0; z < nz; z++ ) {
+                    int idx = z * nlos + x;
+                    uold[idx] = u[idx];
+                    gold[idx] = g[idx];
+
+                    u[idx] = u[idx] - bb[x] * g[idx];
+                    // Apply projection
+                    u[idx] = u[idx] - std::fmax(u[idx], 0.);
+                }
+            }
+            // Reduce epsilon across lines of sight with the maximum function (spg.cu LL403—407)
+            eps_max = std::fmax(eps_max, optim[x]);
+        }
+
+        // Exit the iteration if optimality has been reached for every l.o.s. (spg.cu LL411—412)
+        if ( eps_max <= epsilon )
+            break;
     }
 
 }
 
+void reduction(int nz, int nlos, float result[], float left_curr[], float left_old[], float right_curr[], float right_old[]) {
+    for ( int z1 = 0; z1 < nz; z1++ ) {
+        for ( int x = 0; x < nlos; x++ ) {
+            int idx = z1 * nlos + x;
+            result[x] += (left_curr[idx] - left_old[idx]) * (right_curr[idx] - right_old[idx]);
+        }
+    }
+}
 
 void spg_cpu::prox_l1 ( float *alpha, int niter )
 {
