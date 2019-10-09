@@ -61,6 +61,9 @@ class spg_cpu
     float *p;
     float *pp;
 
+    static const float epsilon = 1e-4;
+    static const float epsilon_0 = 1e-5; // Hard-coded in the original (spg.cu L64)
+
     StopWatchInterface *timer;
 
 public:
@@ -98,7 +101,7 @@ public:
 
 private:
     // Iteration member function
-    void iterate_prox_pos(int niter, float px[], float u[], float gg0[]);
+    void iterate_prox_pos(int niter, float px[], float u[], float gg0[], float epsilon_0, float epsilon);
 
 };
 #endif /* SPG_CPU_H */
