@@ -139,6 +139,7 @@ density_reconstruction::density_reconstruction(boost::property_tree::ptree confi
     #ifdef CUDA_ACC
     prox = new spg(npix, nlp, nframes, f->get_preconditioning_matrix(), thresholds);
     #endif
+    cpu_prox = new spg_cpu(npix, nlp, nframes, f->get_preconditioning_matrix(), thresholds);
 
     // Normalization factor for the fft
     fftFactor     = 1.0 / (((double)npix) * npix);
@@ -364,7 +365,7 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
 
 #endif
             // Run the CPU kernel
-            // Not yet!
+            cpu_prox->prox_pos(alpha_tmp, 10000);
 
             // Output the data from the CPU kernel
             write_float_data(std::string("delta_cpu_o") + dot_ext, alpha_tmp_cpu, ncoeff);

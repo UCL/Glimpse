@@ -48,7 +48,7 @@
 #include "spg.h"
 #include "gpu_utils.h"
 #endif
-
+#include "spg_cpu.h"
 
 #include "wavelet_transform.h"
 
@@ -79,6 +79,7 @@ class density_reconstruction
 #ifdef CUDA_ACC
     spg   *prox;                        /*!< SPG algorithm for fast evaluation of simple proximal operators */
 #endif
+    spg_cpu *cpu_prox;
     
     // Internal reconstruction arrays
     fftwf_complex * delta;
