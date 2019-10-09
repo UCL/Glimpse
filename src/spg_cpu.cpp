@@ -35,14 +35,18 @@
  *  Created on: 2019-10-04
  */
 
+#include <cmath>
+
 #include "spg_cpu.h"
 
+void iterate_prox_pos(int ncoeff, int niter, float px[], float u[], float pp[], float gg0[]);
+
 spg_cpu::spg_cpu( int npix, int nz, int nframes, const double *P, const float *l1_weights ) :
-npix ( npix ), nz ( nz ), nframes ( nframes )
+npix ( npix ), nz ( nz ), nframes ( nframes ),
+nlos ( npix * npix ), ncoeff ( nlos * nz ), nwavcoeff ( ncoeff * nframes )
 {
 
     // Coefficient plurality
-    int ncoeff = npix * npix * nz;
     int nwavcoeff = npix * npix * nframes * nz;
 
     // Allocate arrays for the calculation variables, and zero the arrays
@@ -51,8 +55,22 @@ npix ( npix ), nz ( nz ), nframes ( nframes )
     w = new float[nwavcoeff]();
 
     // Allocate arrays for and store the preconditioning matrix
-    pp = new float[nz*nz];
+    pp = new float[nz*nz]();
     p = new float[nz*nz];
+
+    // copy the preconditioning data
+    for (int zz = 0; zz < nz * nz; zz++) {
+        p[zz] = P[zz];
+    }
+
+    // Calculate the squared matrix
+    for (int z1 = 0; z1 < nz; z1++) {
+        for (int z2 = 0; z2 < nz; z2++) {
+            for (int z3 = 0; z3 < nz; z3++) {
+                pp[z1 * nz + z2] += p[z1 * nz + z3] * p[z3 * nz + z2];
+            }
+        }
+    }
 
     // Initialize the timer
     timer = NULL;
@@ -75,12 +93,59 @@ spg_cpu::~spg_cpu()
 
 void spg_cpu::prox_pos ( float *delta, int niter )
 {
-    int ncoeff = npix * npix * nz;
+    int nlos = npix * npix;
+    int ncoeff = nlos * nz;
 
-    float preconditioned[] = new float[ncoeff]();
-    // Multiply by the preconditioning matrix
+    float conditioned[] = new float[ncoeff]();
+    // Multiply by the preconditioning matrix (spg.cu LL282—287)
+    for ( int z1 = 0; z1 < nz; z1++ ) {
+        for ( int z2 = 0; z2 < nz; z2++ ) {
+            int pindex = z2*nz + z1;
+            for ( int x = 0; x < nlos; x++ ) {
+                int dindex = z2*nz + x;
+                int cindex = z1*nz + x;
+                conditioned[cindex] += delta[dindex] * p[pindex];
+            }
+        }
+    }
+
+    // Square the matrix element-by-element (spg.cu L290)
+    float condsq[] = new float[ncoeff]();
+    for ( int z = 0; z < nz; z++ ){
+        for ( int x = 0; x < nlos; x++ ) {
+            int cindex = z*nz + x;
+            condsq[cindex] = conditioned[cindex] * conditioned[cindex];
+        }
+    }
+    // Sum along the redshift dimension (spg.cu LL292—297)
+    float gg0[] = new float[nlos]();
+    for ( int z = 0; z < nz; z++ ){
+        for ( int x = 0; x < nlos; x++ ) {
+            int cindex = z*nz + x;
+            gg0[x] += condsq[cindex];
+        }
+    }
+
+    // Calculate gg0 (spg.cu L299)
+    for ( int x = 0; x < nlos; x++ ) {
+        gg0[x] = std::sqrt(gg0[x]);
+    }
+
+    iterate_prox_pos(ncoeff, niter, conditioned, u, pp, gg0);
+}
+
+void iterate_prox_pos(int ncoeff, int niter, float px[], float u[], float pp[], float gg0[]) {
+    float g[] = new float[ncoeff];
+    float gold[] = new float[ncoeff];
+
+    float uold[] = new float[ncoeff];
+
+    for ( int iter = 0; iter < niter; iter++){
+
+    }
 
 }
+
 
 void spg_cpu::prox_l1 ( float *alpha, int niter )
 {
