@@ -39,8 +39,6 @@
 
 #include "spg_cpu.h"
 
-void iterate_prox_pos(int ncoeff, int niter, float px[], float u[], float pp[], float gg0[]);
-
 spg_cpu::spg_cpu( int npix, int nz, int nframes, const double *P, const float *l1_weights ) :
 npix ( npix ), nz ( nz ), nframes ( nframes ),
 nlos ( npix * npix ), ncoeff ( nlos * nz ), nwavcoeff ( ncoeff * nframes )
@@ -131,17 +129,25 @@ void spg_cpu::prox_pos ( float *delta, int niter )
         gg0[x] = std::sqrt(gg0[x]);
     }
 
-    iterate_prox_pos(ncoeff, niter, conditioned, u, pp, gg0);
+    iterate_prox_pos(niter, conditioned, u_pos, gg0);
 }
 
-void iterate_prox_pos(int ncoeff, int niter, float px[], float u[], float pp[], float gg0[]) {
+void spg_cpu::iterate_prox_pos(int niter, float px[], float u[], float gg0[]) {
     float g[] = new float[ncoeff];
     float gold[] = new float[ncoeff];
 
     float uold[] = new float[ncoeff];
 
     for ( int iter = 0; iter < niter; iter++){
+        // Initialize the gradient with A^t x (spg.cu L304)
+        for ( int i = 0; i < ncoeff; i++ ) {
+            g[i] = -px[i];
+        }
 
+        // Compute the matrix product which gives g[z] (spg.cu L314)
+        for ( int z = 0; z < nz; z++ ) {
+
+        }
     }
 
 }

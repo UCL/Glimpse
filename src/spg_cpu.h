@@ -96,5 +96,9 @@ public:
     void inject_u(float *h_u);
     void extract_u(float *h_u);
 
+private:
+    // Iteration member function
+    void iterate_prox_pos(int niter, float px[], float u[], float gg0[]);
+
 };
 #endif /* SPG_CPU_H */
