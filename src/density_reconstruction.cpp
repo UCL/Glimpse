@@ -770,7 +770,7 @@ void read_float_data(std::string filename, float *array, int size)
 
 void write_float_data(std::string filename, float *array, int size)
 {
-    std:ofstream outstream;
+    std::ofstream outstream;
     outstream.open(filename, std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
     outstream.write(reinterpret_cast<char*> (array), size * sizeof(float));
     outstream.close();
