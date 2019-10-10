@@ -41,7 +41,7 @@
 #include "density_reconstruction.h"
 
 void read_float_data(std::string filename, float *array, int size);
-void write_float_data(std::string filename, float *array, int size)
+void write_float_data(std::string filename, float *array, int size);
 
 using namespace std;
 
