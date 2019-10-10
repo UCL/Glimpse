@@ -162,13 +162,24 @@ void spg_cpu::iterate_prox_pos(int niter, float px[], float u[], float gg0[], fl
 
     float uold[ncoeff];
 
-    float gudiff[ncoeff];
     float sy[nlos];
     float bb[nlos];
 
     float optim[ncoeff];
 
     for ( int iter = 0; iter < niter; iter++){
+        // Zero fill the arrays
+        for ( int i = 0; i < ncoeff; i++ ) {
+            // Not g
+            // Not u
+            // Not gold
+            // Not uold
+            optim[i] = 0.;
+        }
+        for ( int x = 0; x < nlos; x++ ) {
+            sy[x] = 0.;
+            bb[x] = 0.;
+        }
         // Initialize the gradient with A^t x (spg.cu L304)
         for ( int i = 0; i < ncoeff; i++ ) {
             g[i] = -px[i];
