@@ -94,10 +94,19 @@ spg_cpu::~spg_cpu()
 
 void spg_cpu::prox_pos ( float *delta, int niter )
 {
-    int nlos = npix * npix;
-    int ncoeff = nlos * nz;
+    float conditioned[ncoeff];
+    float condsq[ncoeff];
 
-    float conditioned[] = new float[ncoeff]();
+    float gg0[nlos];
+
+    // zero fill the arrays
+    for ( int i = 0; i < ncoeff; i++ ) {
+        conditioned[i] = 0.;
+    }
+    for ( int x = 0; x < nlos; x++ ) {
+        gg0[x] = 0;
+    }
+
     // Multiply by the preconditioning matrix (spg.cu LL282—287)
     for ( int z1 = 0; z1 < nz; z1++ ) {
         for ( int z2 = 0; z2 < nz; z2++ ) {
@@ -111,7 +120,6 @@ void spg_cpu::prox_pos ( float *delta, int niter )
     }
 
     // Square the matrix element-by-element (spg.cu L290)
-    float condsq[] = new float[ncoeff]();
     for ( int z = 0; z < nz; z++ ){
         for ( int x = 0; x < nlos; x++ ) {
             int cindex = z*nz + x;
@@ -119,7 +127,6 @@ void spg_cpu::prox_pos ( float *delta, int niter )
         }
     }
     // Sum along the redshift dimension (spg.cu LL292—297)
-    float gg0[] = new float[nlos]();
     for ( int z = 0; z < nz; z++ ){
         for ( int x = 0; x < nlos; x++ ) {
             int cindex = z*nz + x;
@@ -150,16 +157,16 @@ void spg_cpu::prox_pos ( float *delta, int niter )
 }
 
 void spg_cpu::iterate_prox_pos(int niter, float px[], float u[], float gg0[], float epsilon_0, float epsilon) {
-    float g[] = new float[ncoeff];
-    float gold[] = new float[ncoeff];
+    float g[ncoeff];
+    float gold[ncoeff];
 
-    float uold[] = new float[ncoeff];
+    float uold[ncoeff];
 
-    float gudiff[] = new float[ncoeff];
-    float sy[] = new float[nlos]();
-    float bb[] = new float[nlos]();
+    float gudiff[ncoeff];
+    float sy[nlos];
+    float bb[nlos];
 
-    float optim[] = new float[ncoeff]();
+    float optim[ncoeff];
 
     for ( int iter = 0; iter < niter; iter++){
         // Initialize the gradient with A^t x (spg.cu L304)
@@ -257,12 +264,12 @@ void spg_cpu::update_weights ( float *l1_weights )
 
 void spg_cpu::inject_u_pos ( float *h_u_pos )
 {
-
+    std::memcpy(u_pos, h_u_pos, ncoeff * sizeof(float));
 }
 
 void spg_cpu::extract_u_pos( float *h_u_pos )
 {
-
+    std::memcpy(h_u_pos, u_pos, ncoeff * sizeof(float));
 }
 
 void spg_cpu::inject_u( float *h_u )
