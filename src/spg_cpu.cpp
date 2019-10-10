@@ -36,7 +36,8 @@
  */
 
 #include <cmath>
-
+#include <limits>
+#include <cstring>
 #include "spg_cpu.h"
 
 void reduction(int nz, int nlos, float result[], float left_curr[], float left_old[], float right_curr[], float right_old[]);
