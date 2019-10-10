@@ -47,6 +47,19 @@ Once the requirements are installed, Glimpse can be compiled by running the  fol
   ```
 This will create a Glimpse executable in the build directory.
 
+Glimpse comes with a small set of tests.  If you want to build them, set the [`BUILD_TESTING`](https://cmake.org/cmake/help/latest/module/CTest.html) CMake variable to `ON`:
+```
+cmake .. -DBUILD_TESTING=ON
+```
+Then you can run the tests with
+```
+make test
+```
+or
+```
+ctest
+```
+
 #### macOS users
 
 If you installed OpenMP with HomeBrew, you will probably need to set the
