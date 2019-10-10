@@ -138,6 +138,7 @@ target_link_libraries(glimpse ${NICAEA_LIBRARIES}
                               ${ARMADILLO_LIBRARIES})
 
 # Testing
+option(BUILD_TESTING "Build the testing tree." OFF)
 include(CTest)
 
 if(BUILD_TESTING)
