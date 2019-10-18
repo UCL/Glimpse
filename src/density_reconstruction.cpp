@@ -373,6 +373,9 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
             write_float_data(std::string("delta_cpu_o") + dot_ext, alpha_tmp_cpu, ncoeff);
             write_float_data(std::string("u_pos_cpu_o") + dot_ext, u_pos_cpu, ncoeff);
 
+            delete[] u_pos_cpu;
+            // But not alpha_tmp_cpu
+
         // Compare to the captured output data
             float* alpha_after = new float[ncoeff];
             read_float_data(std::string("delta_o") + dot_ext, alpha_after, ncoeff);
@@ -420,6 +423,13 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
         float* h_u = new float[nwavcoeff];
         read_float_data(std::string("u_i") + dot_ext, h_u, nwavcoeff);
 
+        // Copies of the input data for the CPU kernel
+        float *alpha_tmp_cpu = new float[nwavcoeff];
+        std::memcpy(alpha_tmp_cpu, alpha_tmp, sizeof(float)*nwavcoeff);
+        float *u_cpu = new float[nwavcoeff];
+        std::memcpy(u_cpu, h_u, sizeof(float) * nwavcoeff);
+
+
 #ifdef CUDA_ACC
         prox->inject_u(h_u);
         prox->prox_l1(alpha_tmp,1000, iter == niter/2);
@@ -427,6 +437,17 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
 #else
         // TODO: Implement CPU prox operator
 #endif
+
+        cpu_prox->inject_u(u_cpu);
+        cpu_prox->prox_l1(alpha_tmp_cpu, 1000);
+        cpu_prox->extract_u(u_cpu);
+
+        // Output the data from the CPU kernel
+        write_float_data(std::string("alpha_cpu_o") + dot_ext, alpha_tmp_cpu, nwavcoeff);
+        write_float_data(std::string("u_cpu_o") + dot_ext, u_cpu, nwavcoeff);
+
+        delete[] alpha_tmp_cpu;
+        delete[] u_cpu;
 
         // Fista update of the iterates
         tk = 0.5 * (1.0 + sqrt(1.0 + 4.0 * old_tk * old_tk));
