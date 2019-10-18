@@ -45,11 +45,9 @@ void reduction(int nz, int nlos, float result[], float left_curr[], float left_o
 
 spg_cpu::spg_cpu( int npix, int nz, int nframes, const double *P, const float *l1_weights ) :
 npix ( npix ), nz ( nz ), nframes ( nframes ),
-nlos ( npix * npix ), ncoeff ( nlos * nz ), nwavcoeff ( ncoeff * nframes )
+nlos ( npix * npix ), ncoeff ( nlos * nz ),
+nwavelets (nlos * nframes), nwavcoeff ( nwavelets * nz )
 {
-
-    // Coefficient plurality
-    int nwavcoeff = npix * npix * nframes * nz;
 
     // Allocate arrays for the calculation variables, and zero the arrays
     u = new float[nwavcoeff]();
@@ -266,12 +264,178 @@ void reduction(int nz, int nlos, float result[], float left_curr[], float left_o
 
 void spg_cpu::prox_l1 ( float *alpha, int niter )
 {
-// Do nothing
+    float conditioned[nwavcoeff];
+    float condsq[nwavcoeff];
+
+    float gg0[nwavelets];
+
+    // zero fill the arrays (spg.cu LL67—70)
+    for ( int i = 0; i < nwavcoeff; i++ ) {
+        conditioned[i] = 0.;
+    }
+    // (spg.cu L62)
+    for ( int l = 0; l < nwavelets; l++ ) {
+        gg0[l] = 0;
+    }
+
+    // Multiply by the preconditioning matrix (spg.cu LL84—87)
+    for ( int z1 = 0; z1 < nz; z1++ ) {
+        for ( int z2 = 0; z2 < nz; z2++ ) {
+            int pindex = z2*nz + z1;
+            for ( int l = 0; l < nwavelets; l++ ) {
+                int aindex = z2*nz + l;
+                int cindex = z1*nz + l;
+                conditioned[cindex] += alpha[aindex] * p[pindex];
+            }
+        }
+    }
+
+    // Square the matrix element-by-element (spg.cu L92)
+    for ( int z = 0; z < nz; z++ ){
+        for ( int x = 0; x < nlos; x++ ) {
+            int cindex = z*nz + x;
+            condsq[cindex] = conditioned[cindex] * conditioned[cindex];
+        }
+    }
+    // Sum along the redshift dimension (spg.cu LL94—100)
+    for ( int z = 0; z < nz; z++ ){
+        for ( int l = 0; l < nwavelets; w++ ) {
+            int cindex = z*nz + l;
+            gg0[l] += condsq[cindex];
+        }
+    }
+
+    // Calculate gg0 (spg.cu L101)
+    for ( int l = 0; l < nwavelets; l++ ) {
+        gg0[l] = std::sqrt(gg0[l]);
+    }
+
+    // Iterate (spg.cu LL104—222
+    iterate_prox_l1(niter, conditioned, u, gg0, epsilon_0, epsilon_l1);
+
+    // Compute transformation of the resulting array (spg.cu LL226—239)
+    for ( int z1 = 0; z1 < nz; z1++ ) {
+        for ( int l = 0; l < nwavelets; l++ ) {
+            int idx = z1 * nlos + l;
+            alpha[idx] = 0.;
+            for ( int z2 = 0; z2 < nz; z2++ ) {
+                int idx2 = z2 * nlos + w;
+                if (u[idx2] < 0.) {
+                    alpha[idx] += u[idx2] * p[z2 * nz + z1];
+                }
+            }
+        }
+    }
+}
+
+void spg_cpu::iterate_prox_l1(int niter, float px[], float u[], float gg0[], float epsilon_0, float epsilon) {
+    float g[nwavcoeff];
+    float gold[nwavcoeff];
+
+    float uold[nwavcoeff];
+
+    float sy[nwavelets];
+    float bb[nwavelets];
+
+    float optim[nwavcoeff];
+
+    for ( int iter = 0; iter < niter; iter++){
+        // Zero fill the arrays
+        for ( int i = 0; i < nwavcoeff; i++ ) {
+            // Not g
+            // Not u
+            // Not gold
+            // Not uold
+            optim[i] = 0.;
+        }
+        for ( int l = 0; l < nwavelets; l++ ) {
+            sy[l] = 0.;
+            bb[l] = 0.;
+        }
+        // Initialize the gradient with A^t x (spg.cu L106)
+        for ( int i = 0; i < nwavcoeff; i++ ) {
+            g[i] = -px[i];
+        }
+
+        // Compute the matrix product which gives g[z] (spg.cu L116)
+        for ( int z = 0; z < nz; z++ ) {
+            for ( int l = 0; l < nwavelets; l++ ) {
+                for ( int z1 = 0; z1 < nz; z1++) {
+                    g[z * nz + l] += pp[z1 * nz + z] * u[z1 * nwavelets + l];
+                }
+            }
+        }
+
+        // Compute BB steps (spg.cu LL120—161)
+        if ( iter > 0 ) {
+            reduction(nz, nwavelets, sy, g, gold, u, uold);
+            if (iter % 2) {
+                reduction(nz, nwavelets, bb, g, gold, g, gold);
+                for ( int l = 0; l < nwavelets; l++ ) {
+                    bb[l] = (bb[l] == 0.) ? 0. : sy[l]/bb[l];
+                }
+            } else {
+                reduction(nz, nwavelets, bb, u, uold, u, uold);
+                for ( int l = 0; l < nwavelets; l++ ) {
+                    bb[l] = (sy[l] == 0.) ? 0. : bb[l]/sy[l];
+                }
+            }
+        }
+
+        // Compute optimality checks (spg.cu LL164—177) and reduce over redshift (LL179—184)
+        for ( int z  = 0; z < nz; z++ ) {
+            for ( int l = 0; l < nwavelets; l++ ) {
+                int idx = z * nwavelets + l;
+                if ( std::sqrt(gg0[l]) >= epsilon_0 ) {
+                    float vv;
+                    const float c = 1 - 1e-5;
+                    if ( u[l] <= -c * w )
+                        vv = std::fmin(0.f, g[idx]);
+                    if ( u[l] >= c * w )
+                        vv = std::fmax(0.f, g[idx]);
+                    else
+                        vv = g[idx];
+                    optim[l] += vv * vv / gg0[l];
+                }
+            }
+        }
+        // spg.cu LL189—192
+        for ( int l = 0; l < nwavelets; l++ ) {
+            optim[l] = std::sqrt(optim[l]);
+        }
+
+        float eps_max = -std::numeric_limits<float>::infinity();
+        // Update variables only if optimality has not been achieved (spg.cu LL196—216)
+        // Loop over lines of sight
+        for ( int l = 0; l < nwavelets; l++ ) {
+            if (optim[l] > epsilon) {
+                // Prevent bb from increasing in magnitude without bound
+                bb[l] = ( std::fabs(bb[l]) > 1.0 ) ? 0.001 : bb[l];
+                // Update uold, gold
+                for ( int z = 0; z < nz; z++ ) {
+                    int idx = z * nwavelets + l;
+                    uold[idx] = u[idx];
+                    gold[idx] = g[idx];
+
+                    u[idx] = u[idx] - bb[l] * g[idx];
+                    // Apply projection
+                    u[idx] = u[idx] - std::copysign(std::fdim(std::fabs(u[idx]), w[idx]), u[idx]);
+                }
+            }
+            // Reduce epsilon across lines of sight with the maximum function (spg.cu LL211—215)
+            eps_max = std::fmax(eps_max, optim[l]);
+        }
+
+        // Exit the iteration if optimality has been reached for every l.o.s. (spg.cu LL219—221)
+        if ( eps_max <= epsilon )
+            break;
+    }
+
 }
 
 void spg_cpu::update_weights ( float *l1_weights )
 {
-
+    std::memcpy(w, l1_weights, nwavcoeff * sizeof(float));
 }
 
 void spg_cpu::inject_u_pos ( float *h_u_pos )
@@ -286,10 +450,10 @@ void spg_cpu::extract_u_pos( float *h_u_pos )
 
 void spg_cpu::inject_u( float *h_u )
 {
-
+    std::memcpy(u, h_u, nwavcoeff * sizeof(float));
 }
 
 void spg_cpu::extract_u( float *h_u )
 {
-
+    std::memcpy(h_u, u, nwavcoeff * sizeof(float));
 }

@@ -50,6 +50,7 @@ class spg_cpu
     static const int nlos;
     static const int ncoeff;
     static const int nwavcoeff;
+    static const int nwavelets;
 
     // Pointers to the data arrays
     //float * x; // Not needed due to not copying data to the GPU
@@ -61,8 +62,9 @@ class spg_cpu
     float *p;
     float *pp;
 
-    static const float epsilon = 1e-4;
-    static const float epsilon_0 = 1e-5; // Hard-coded in the original (spg.cu L64)
+    static const float epsilon = 1e-4; // Hard-coded in the original (spg.cu L264)
+    static const float epsilon_0 = 1e-5; // Hard-coded in the original (spg.cu L64 & L 265)
+    static const float epsilon_l1 = 1e-3; // Hard-coded in the original (spg.cu L63)
 
     StopWatchInterface *timer;
 
@@ -100,8 +102,9 @@ public:
     void extract_u(float *h_u);
 
 private:
-    // Iteration member function
+    // Iteration member functions
     void iterate_prox_pos(int niter, float px[], float u[], float gg0[], float epsilon_0, float epsilon);
+    void iterate_prox_l1(int niter, float px[], float u[], float gg0[], float epsilon_0, float epsilon);
 
 };
 #endif /* SPG_CPU_H */
