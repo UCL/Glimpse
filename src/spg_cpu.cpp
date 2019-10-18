@@ -313,7 +313,12 @@ void spg_cpu::prox_l1 ( float *alpha, int niter )
     // Iterate (spg.cu LL104—222
     iterate_prox_l1(niter, conditioned, u, gg0, epsilon_0, epsilon_l1);
 
-    // Compute transformation of the resulting array (spg.cu LL226—239)
+    // Compute transformation of the resulting array (spg.cu LL226—229)
+    for (int i = 0; i < nwavcoeff; i++) {
+        conditioned[i] = u[i] - std::copysign( std::fdim( std::fabs( u[i] ), w[i]), u[i] );
+    }
+
+    // Compute matrix product (spg.cu LL231—233
     for ( int z1 = 0; z1 < nz; z1++ ) {
         for ( int l = 0; l < nwavelets; l++ ) {
             int idx = z1 * nlos + l;
@@ -321,7 +326,7 @@ void spg_cpu::prox_l1 ( float *alpha, int niter )
             for ( int z2 = 0; z2 < nz; z2++ ) {
                 int idx2 = z2 * nlos + w;
                 if (u[idx2] < 0.) {
-                    alpha[idx] += u[idx2] * p[z2 * nz + z1];
+                    alpha[idx] += conditioned[idx2] * p[z2 * nz + z1];
                 }
             }
         }
