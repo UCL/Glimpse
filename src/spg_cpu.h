@@ -44,13 +44,13 @@
 class spg_cpu
 {
     // Array dimensions
-    static const int npix;
-    static const int nz;
-    static const int nframes;
-    static const int nlos;
-    static const int ncoeff;
-    static const int nwavcoeff;
-    static const int nwavelets;
+    const int npix;
+    const int nz;
+    const int nframes;
+    const int nlos;
+    const int ncoeff;
+    const int nwavcoeff;
+    const int nwavelets;
 
     // Pointers to the data arrays
     //float * x; // Not needed due to not copying data to the GPU
