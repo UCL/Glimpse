@@ -46,7 +46,7 @@ void reduction(int nz, int nlos, float result[], float left_curr[], float left_o
 spg_cpu::spg_cpu( int npix, int nz, int nframes, const double *P, const float *l1_weights ) :
 npix ( npix ), nz ( nz ), nframes ( nframes ),
 nlos ( npix * npix ), ncoeff ( nlos * nz ),
-nwavelets (nlos * nframes), nwavcoeff ( nwavelets * nz )
+nwavelets (nlos * nframes), nwavcoeff ( nlos * nframes * nz )
 {
 
     // Allocate arrays for the calculation variables, and zero the arrays
