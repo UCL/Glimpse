@@ -324,7 +324,7 @@ void spg_cpu::prox_l1 ( float *alpha, int niter )
             int idx = z1 * nlos + l;
             alpha[idx] = 0.;
             for ( int z2 = 0; z2 < nz; z2++ ) {
-                int idx2 = z2 * nlos + w;
+                int idx2 = z2 * nlos + w[l];
                 if (u[idx2] < 0.) {
                     alpha[idx] += conditioned[idx2] * p[z2 * nz + z1];
                 }
@@ -394,9 +394,9 @@ void spg_cpu::iterate_prox_l1(int niter, float px[], float u[], float gg0[], flo
                 if ( std::sqrt(gg0[l]) >= epsilon_0 ) {
                     float vv;
                     const float c = 1 - 1e-5;
-                    if ( u[l] <= -c * w )
+                    if ( u[l] <= -c * w[l] )
                         vv = std::fmin(0.f, g[idx]);
-                    if ( u[l] >= c * w )
+                    if ( u[l] >= c * w[l] )
                         vv = std::fmax(0.f, g[idx]);
                     else
                         vv = g[idx];
