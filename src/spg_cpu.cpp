@@ -147,8 +147,8 @@ void spg_cpu::prox_pos ( float *delta, int niter )
             delta[idx] = 0.;
             for ( int z2 = 0; z2 < nz; z2++ ) {
                 int idx2 = z2 * nlos + x;
-                if (u[idx2] < 0.) {
-                    delta[idx] += u[idx2] * p[z2 * nz + z1];
+                if (u_pos[idx2] < 0.) { // Test equivalent to spg.cu L418
+                    delta[idx] += u_pos[idx2] * p[z2 * nz + z1];
                 }
             }
         }
