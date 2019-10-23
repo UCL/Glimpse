@@ -62,9 +62,9 @@ class spg_cpu
     float *p;
     float *pp;
 
-    static const float epsilon = 1e-4; // Hard-coded in the original (spg.cu L264)
-    static const float epsilon_0 = 1e-5; // Hard-coded in the original (spg.cu L64 & L 265)
-    static const float epsilon_l1 = 1e-3; // Hard-coded in the original (spg.cu L63)
+    static constexpr float epsilon = 1e-4; // Hard-coded in the original (spg.cu L264)
+    static constexpr float epsilon_0 = 1e-5; // Hard-coded in the original (spg.cu L64 & L 265)
+    static constexpr float epsilon_l1 = 1e-3; // Hard-coded in the original (spg.cu L63)
 
     StopWatchInterface *timer;
 
