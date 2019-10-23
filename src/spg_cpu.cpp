@@ -299,7 +299,7 @@ void spg_cpu::prox_l1 ( float *alpha, int niter )
     }
     // Sum along the redshift dimension (spg.cu LL94—100)
     for ( int z = 0; z < nz; z++ ){
-        for ( int l = 0; l < nwavelets; w++ ) {
+        for ( int l = 0; l < nwavelets; l++ ) {
             int cindex = z*nz + l;
             gg0[l] += condsq[cindex];
         }
