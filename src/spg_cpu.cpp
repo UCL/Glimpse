@@ -283,8 +283,8 @@ void spg_cpu::prox_l1 ( float *alpha, int niter )
         for ( int z2 = 0; z2 < nz; z2++ ) {
             int pindex = z2*nz + z1;
             for ( int l = 0; l < nwavelets; l++ ) {
-                int aindex = z2*nz + l;
-                int cindex = z1*nz + l;
+                int aindex = z2*nwavelets + l;
+                int cindex = z1*nwavelets + l;
                 conditioned[cindex] += alpha[aindex] * p[pindex];
             }
         }
@@ -292,15 +292,15 @@ void spg_cpu::prox_l1 ( float *alpha, int niter )
 
     // Square the matrix element-by-element (spg.cu L92)
     for ( int z = 0; z < nz; z++ ){
-        for ( int x = 0; x < nlos; x++ ) {
-            int cindex = z*nz + x;
+        for ( int x = 0; x < nwavelets; x++ ) {
+            int cindex = z*nwavelets + x;
             condsq[cindex] = conditioned[cindex] * conditioned[cindex];
         }
     }
     // Sum along the redshift dimension (spg.cu LL94—100)
     for ( int z = 0; z < nz; z++ ){
         for ( int l = 0; l < nwavelets; l++ ) {
-            int cindex = z*nz + l;
+            int cindex = z*nwavelets + l;
             gg0[l] += condsq[cindex];
         }
     }
@@ -310,7 +310,7 @@ void spg_cpu::prox_l1 ( float *alpha, int niter )
         gg0[l] = std::sqrt(gg0[l]);
     }
 
-    // Iterate (spg.cu LL104—222
+    // Iterate (spg.cu LL104—222)
     iterate_prox_l1(niter, conditioned, u, gg0, epsilon_0, epsilon_l1);
 
     // Compute transformation of the resulting array (spg.cu LL226—229)
@@ -318,16 +318,14 @@ void spg_cpu::prox_l1 ( float *alpha, int niter )
         conditioned[i] = u[i] - std::copysign( std::fdim( std::fabs( u[i] ), w[i]), u[i] );
     }
 
-    // Compute matrix product (spg.cu LL231—233
+    // Compute matrix product (spg.cu LL231—233)
     for ( int z1 = 0; z1 < nz; z1++ ) {
         for ( int l = 0; l < nwavelets; l++ ) {
-            int idx = z1 * nlos + l;
+            int idx = z1 * nwavelets + l;
             alpha[idx] = 0.;
             for ( int z2 = 0; z2 < nz; z2++ ) {
-                int idx2 = z2 * nlos + w[l];
-                if (u[idx2] < 0.) {
-                    alpha[idx] += conditioned[idx2] * p[z2 * nz + z1];
-                }
+                int idx2 = z2 * nwavelets + w[l];
+                alpha[idx] += conditioned[idx2] * p[z2 * nz + z1];
             }
         }
     }
