@@ -632,6 +632,8 @@ void density_reconstruction::reconstruct()
     prox->update_weights(weights);
 #endif
 
+    cpu_prox->update_weights(weights);
+
     std::cout << "Running main iteration" << std::endl;
     run_main_iteration(nRecIter);
 
