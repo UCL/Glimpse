@@ -85,7 +85,8 @@ set(GLIMPSE_SRC
 		src/density_reconstruction.cpp
 		src/starlet_2d.cpp
 		src/wavelet_transform.cpp
-		src/gpu_utils.c)
+		src/gpu_utils.c
+		src/spg_cpu.cpp)
 
 # VERSIONING from git
 execute_process(

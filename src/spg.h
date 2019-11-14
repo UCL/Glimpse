@@ -78,19 +78,31 @@ public:
     /* Compute the proximity operator of the sparsity constraint.
      * 
      */
-    void prox_l1(float *alpha, int niter=10000);
+    void prox_l1(float *alpha, int niter=10000, bool do_output=false);
 
 
     /* Compute the proximity operator of the positivity constraint.
      *
      */
-    void prox_pos(float *delta, int niter=10000);
+    void prox_pos(float *delta, int niter=10000, bool do_output=false);
     
     /* Updates the l1 thresholds
      * 
      */
     void update_weights(float *l1_weights);
     
+    void inject_u_pos(float *h_u_pos);
+    void extract_u_pos(float *h_u_pos);
+
+    void inject_u(float *h_u);
+    void extract_u(float *h_u);
+
+private:
+    void write_config_file();
+    void write_p_pp(char* suffix);
+    void write_l1_weights(char* suffix);
+    void write_pos_data(char* suffix);
+    void write_l1_data(char* suffix);
 };
 
 

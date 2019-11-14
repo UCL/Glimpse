@@ -34,8 +34,13 @@
 
 #include <sparse2d/IM_IO.h>
 #include <iostream>
+#include <string>
 #include "spg.h"
 #include "spg.cuh"
+
+#ifndef CAPTURE_OUTPUT
+#define CAPTURE_OUTPUT true
+#endif
 
 spg::spg ( int npix, int nz, int nframes, const double *P, const float *l1_weights ) :
     npix ( npix ), nz ( nz ), nframes ( nframes )
@@ -112,6 +117,13 @@ spg::spg ( int npix, int nz, int nframes, const double *P, const float *l1_weigh
         spg_store_matrix ( nz, p, pp );
     }
 
+    if (CAPTURE_OUTPUT) {
+        write_config_file();
+        write_l1_weights("i");
+        write_p_pp("i");
+    }
+
+
     timer = NULL;
     sdkCreateTimer ( &timer );
     sdkResetTimer ( &timer );
@@ -137,7 +149,7 @@ spg::~spg()
     free ( pp );
 }
 
-void spg::prox_pos ( float *delta, int niter )
+void spg::prox_pos ( float *delta, int niter, bool do_output )
 {
     sdkResetTimer ( &timer );
     sdkStartTimer ( &timer );
@@ -147,7 +159,16 @@ void spg::prox_pos ( float *delta, int niter )
         checkCudaErrors ( cudaSetDevice ( whichGPUs[i] ) );
 
         // Copy wavelet coefficients to device
-        checkCudaErrors ( cudaMemcpy2DAsync ( d_x[i], coeff_stride_pos[i]*sizeof ( float ), &delta[i * coeff_stride_pos[0]], npix * npix * sizeof ( float ), coeff_stride_pos[i]*sizeof ( float ), nz, cudaMemcpyHostToDevice ) );
+        checkCudaErrors ( cudaMemcpy2DAsync (
+                d_x[i], coeff_stride_pos[i]*sizeof ( float ),
+                &delta[i * coeff_stride_pos[0]], npix * npix * sizeof ( float ),
+                coeff_stride_pos[i]*sizeof ( float ), nz,
+                cudaMemcpyHostToDevice
+                ) );
+    }
+
+    if (do_output && CAPTURE_OUTPUT) {
+        write_pos_data("w");
     }
 
     for ( int i = 0; i < nGPU; i++ ) {
@@ -163,7 +184,16 @@ void spg::prox_pos ( float *delta, int niter )
         checkCudaErrors ( cudaSetDevice ( whichGPUs[i] ) );
 
         // Recover wavelet coefficients from device
-        checkCudaErrors ( cudaMemcpy2DAsync ( &delta[i * coeff_stride_pos[0]], npix * npix * sizeof ( float ), d_x[i], coeff_stride_pos[i]*sizeof ( float ), coeff_stride_pos[i]*sizeof ( float ), nz, cudaMemcpyDeviceToHost ) );
+        checkCudaErrors ( cudaMemcpy2DAsync (
+                &delta[i * coeff_stride_pos[0]], npix * npix * sizeof ( float ),
+                d_x[i], coeff_stride_pos[i]*sizeof ( float ),
+                coeff_stride_pos[i]*sizeof ( float ), nz,
+                cudaMemcpyDeviceToHost
+                ) );
+    }
+
+    if (do_output && CAPTURE_OUTPUT) {
+        write_pos_data("c");
     }
 
     for ( int i = 0; i < nGPU; i++ ) {
@@ -176,7 +206,7 @@ void spg::prox_pos ( float *delta, int niter )
     std::cout << "Time spent for solving positivity spg " <<  sdkGetTimerValue ( &timer ) << std::endl;
 }
 
-void spg::prox_l1 ( float *alpha, int niter )
+void spg::prox_l1 ( float *alpha, int niter, bool do_output )
 {
     sdkResetTimer ( &timer );
     sdkStartTimer ( &timer );
@@ -186,8 +216,17 @@ void spg::prox_l1 ( float *alpha, int niter )
         checkCudaErrors ( cudaSetDevice ( whichGPUs[i] ) );
 
         // Copy wavelet coefficients to device
-        checkCudaErrors ( cudaMemcpy2DAsync ( d_x[i], coeff_stride[i]*sizeof ( float ), &alpha[i * coeff_stride[0]], npix * npix * nframes * sizeof ( float ), coeff_stride[i]*sizeof ( float ), nz, cudaMemcpyHostToDevice ) );
+        checkCudaErrors ( cudaMemcpy2DAsync (
+                d_x[i], coeff_stride[i]*sizeof ( float ),
+                &alpha[i * coeff_stride[0]], npix * npix * nframes * sizeof ( float ),
+                coeff_stride[i]*sizeof ( float ), nz,
+                cudaMemcpyHostToDevice
+                ) );
         
+    }
+
+    if (do_output && CAPTURE_OUTPUT) {
+        write_l1_data("w");
     }
 
     for ( int i = 0; i < nGPU; i++ ) {
@@ -203,7 +242,12 @@ void spg::prox_l1 ( float *alpha, int niter )
         checkCudaErrors ( cudaSetDevice ( whichGPUs[i] ) );
 
         // Recover wavelet coefficients from device
-        checkCudaErrors ( cudaMemcpy2DAsync ( &alpha[i * coeff_stride[0]], npix * npix * nframes * sizeof ( float ), d_x[i], coeff_stride[i]*sizeof ( float ), coeff_stride[i] * sizeof ( float ), nz, cudaMemcpyDeviceToHost ) );
+        checkCudaErrors ( cudaMemcpy2DAsync (
+                &alpha[i * coeff_stride[0]], npix * npix * nframes * sizeof ( float ),
+                d_x[i], coeff_stride[i]*sizeof ( float ),
+                coeff_stride[i] * sizeof ( float ), nz,
+                cudaMemcpyDeviceToHost
+                ) );
     }
 
     for ( int i = 0; i < nGPU; i++ ) {
@@ -212,6 +256,11 @@ void spg::prox_l1 ( float *alpha, int niter )
         checkCudaErrors ( cudaDeviceSynchronize() );
         checkCudaErrors ( cudaPeekAtLastError() );
     }
+
+    if (do_output && CAPTURE_OUTPUT) {
+        write_l1_data("c");
+    }
+
     sdkStopTimer ( &timer );
     std::cout << "Time spent for solving l1 spg " <<  sdkGetTimerValue ( &timer ) << std::endl;
 }
@@ -229,4 +278,196 @@ void spg::update_weights ( float *l1_weights )
         checkCudaErrors ( cudaSetDevice ( whichGPUs[i] ) );
         checkCudaErrors ( cudaDeviceSynchronize() );
     }
+}
+
+void spg::inject_u_pos ( float *h_u_pos )
+{
+    checkCudaErrors ( cudaMemcpy2DAsync (
+            d_u_pos[0], coeff_stride_pos[0] * sizeof(float),
+            h_u_pos, npix * npix * sizeof(float),
+            coeff_stride_pos[0] * sizeof(float), nz,
+            cudaMemcpyHostToDevice
+            ) );
+}
+
+void spg::extract_u_pos( float *h_u_pos )
+{
+    checkCudaErrors ( cudaMemcpy2D (
+        h_u_pos, npix * npix * sizeof(float),
+        d_u_pos[0], coeff_stride_pos[0] * sizeof(float),
+        coeff_stride_pos[0] * sizeof(float), nz,
+        cudaMemcpyDeviceToHost
+        ) );
+}
+
+void spg::inject_u( float *h_u )
+{
+    checkCudaErrors ( cudaMemcpy2DAsync (
+            d_u[0], coeff_stride[0] * sizeof(float),
+            h_u, npix * npix * nframes * sizeof(float),
+            coeff_stride[0] * sizeof(float), nz,
+            cudaMemcpyHostToDevice
+            ) );
+}
+
+void spg::extract_u( float *h_u )
+{
+    checkCudaErrors ( cudaMemcpy2D (
+        h_u, npix * npix * nframes * sizeof(float),
+        d_u[0], coeff_stride[0] * sizeof(float),
+        coeff_stride[0] * sizeof(float), nz,
+        cudaMemcpyDeviceToHost
+        ) );
+}
+
+void spg::write_config_file( )
+{
+    std::ofstream cfgstream;
+    cfgstream.open("spg.cfg", std::fstream::trunc);
+
+    cfgstream << "[dimensions]" << std::endl;
+    cfgstream << "npix=" << npix << std::endl;
+    cfgstream << "nz=" << nz << std::endl;
+
+    cfgstream.close();
+
+    std::cerr << "nz = " << nz << std::endl;
+    std::cerr << "npix = " << npix << std::endl;
+    std::cerr << "nframes = " << nframes << std::endl;
+}
+
+void spg::write_p_pp(char *suffix)
+{
+    std::string pname = "p_";
+    std::string ppname = "pp_";
+    std::string extension = ".dat";
+
+    pname.append(suffix).append(extension);
+    ppname.append(suffix).append(extension);
+
+    std::ofstream pstream;
+    pstream.open(pname, std::fstream::out | std::fstream::trunc | std::fstream::binary);
+    pstream.write(reinterpret_cast<char *> (p), sizeof(float) * nz * nz);
+    pstream.close();
+
+    pstream.open(ppname, std::fstream::out | std::fstream::trunc | std::fstream::binary);
+    pstream.write(reinterpret_cast<char *> (pp), sizeof(float) * nz * nz);
+    pstream.close();
+}
+
+void spg::write_l1_weights(char *suffix)
+{
+    std::ofstream wstream;
+
+    std::string wname = "w_";
+    std::string extension = ".dat";
+
+    float* w_rec = new float[npix * npix * nframes * nz];
+
+    checkCudaErrors( cudaMemcpy2D(
+            w_rec, npix * npix * nframes * sizeof(float),
+            d_w[0], coeff_stride[0] * sizeof(float),
+            coeff_stride[0]*sizeof(float), nz,
+            cudaMemcpyDeviceToHost
+            ) );
+
+    wname.append(suffix).append(extension);
+
+    wstream.open(wname, std::fstream::out | std::fstream::trunc | std::fstream::binary);
+    wstream.write(reinterpret_cast<char *> (w_rec), sizeof(float) * npix * npix * nframes * nz);
+    wstream.close();
+
+    delete[] w_rec;
+}
+
+void spg::write_pos_data(char* suffix)
+{
+    std::ofstream uxstream;
+
+    std::string uname = "upos_";
+    std::string xname = "delta_";
+    std::string extension = ".dat";
+
+    // Allocate memory to receive the data
+    float* alpha_rec = new float[npix * npix * nframes * nz];
+    float* u_pos_rec = new float[npix * npix * nz];
+
+    // Synchronously get the data. It will be needed immediately. Assumes ngpu == 1
+    checkCudaErrors( cudaMemcpy2D(
+            alpha_rec, npix * npix * sizeof(float),
+            d_x[0], coeff_stride_pos[0] * sizeof(float),
+            coeff_stride_pos[0] * sizeof(float), nz,
+            cudaMemcpyDeviceToHost
+            ) );
+
+    checkCudaErrors( cudaMemcpy2D(
+            u_pos_rec, npix * npix * sizeof(float),
+            d_u_pos[0], coeff_stride_pos[0] * sizeof(float),
+            coeff_stride_pos[0] * sizeof(float), nz,
+            cudaMemcpyDeviceToHost
+        ) );
+
+    uname.append(suffix).append(extension);
+    xname.append(suffix).append(extension);
+
+    long u_buffer_bytes = sizeof(float) * coeff_stride_pos[0] * nz;
+    long alpha_bytes = sizeof(float) * npix * npix * nz;
+
+    uxstream.open(uname, std::fstream::out | std::fstream::trunc | std::fstream::binary);
+    uxstream.write(reinterpret_cast<char *> (u_pos_rec), u_buffer_bytes);
+    uxstream.close();
+
+    uxstream.open(xname, std::fstream::out | std::fstream::trunc | std::fstream::binary);
+    uxstream.write(reinterpret_cast<char *> (alpha_rec), alpha_bytes);
+    uxstream.close();
+
+    delete[] alpha_rec;
+    delete[] u_pos_rec;
+
+
+}
+
+void spg::write_l1_data(char* suffix)
+{
+    std::ofstream l1stream;
+
+    std::string uname = "u_";
+    std::string xname = "alpha_";
+    std::string extension = ".dat";
+
+    uname.append(suffix).append(extension);
+    xname.append(suffix).append(extension);
+
+    // Allocate memory to receive the data
+    float* alpha_rec = new float[npix * npix * nframes * nz];
+    float* u_rec = new float[npix * npix * nframes * nz];
+
+    // Synchronously get the data. It will be needed immediately. Assumes ngpu == 1
+    checkCudaErrors( cudaMemcpy2D(
+            alpha_rec, npix * npix * nframes * sizeof(float),
+            d_x[0], coeff_stride[0] * sizeof(float),
+            coeff_stride[0] * sizeof(float), nz,
+            cudaMemcpyDeviceToHost
+            ) );
+
+    checkCudaErrors( cudaMemcpy2D(
+            u_rec, npix * npix * nframes * sizeof(float),
+            d_x[0], coeff_stride[0] * sizeof(float),
+            coeff_stride[0] * sizeof(float), nz,
+            cudaMemcpyDeviceToHost
+            ) );
+
+    long buffer_bytes = sizeof(float) * npix * npix * nframes * nz;
+
+    l1stream.open(xname, std::fstream::out | std::fstream::trunc | std::fstream::binary);
+    l1stream.write(reinterpret_cast<char *> (alpha_rec), buffer_bytes);
+    l1stream.close( );
+
+    l1stream.open(uname, std::fstream::out | std::fstream::trunc | std::fstream::binary);
+    l1stream.write(reinterpret_cast<char *> (u_rec), buffer_bytes);
+    l1stream.close( );
+
+    delete[] alpha_rec;
+    delete[] u_rec;
+
 }
