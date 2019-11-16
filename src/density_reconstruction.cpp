@@ -32,12 +32,15 @@
  *
  */
 #include <iostream>
+#include <fstream>
 #include <cmath>
 #ifdef DEBUG_FITS
 #include <sparse2d/IM_IO.h>
 #endif
 
 #include "density_reconstruction.h"
+
+void read_float_data(std::string filename, float *array, int size);
 
 using namespace std;
 
@@ -311,6 +314,10 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
     double old_tk = 1.0;
     double tk;
 
+    // single stepping
+    niter = 1;
+    std::string dot_ext = ".dat";
+
     for (long iter = 0; iter < niter; iter++) {
         std::cout << "Iteration : " << iter << std::endl;
 
@@ -336,18 +343,39 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
                 alpha_tmp[ind] = delta_tmp[ind][0] * fftFactor;
             }
 
+            // Read the 'before' data files for the positivity step
+            read_float_data(std::string("delta_i") + dot_ext, alpha_tmp, ncoeff);
+            float* h_u_pos = new float[npix * npix * nlp];
+            read_float_data(std::string("upos_i") + dot_ext, h_u_pos, npix * npix * nlp);
+
 #ifdef CUDA_ACC
-            prox->prox_pos(alpha_tmp);
+            prox->inject_u_pos(h_u_pos);
+            prox->prox_pos(alpha_tmp, 10000, true);
+            prox->extract_u_pos(h_u_pos);
+
 #else
 
 #endif
-            #pragma omp parallel for
+        // Compare to the captured output data
+            float* alpha_after = new float[ncoeff];
+            read_float_data(std::string("delta_o") + dot_ext, alpha_after, ncoeff);
+            float* u_pos_after = new float[npix * npix * nlp];
+            read_float_data(std::string("upos_o") + dot_ext, u_pos_after, npix * npix * nlp);
+
+       // compare_pos_data(alpha_tmp, alpha_after, h_u_pos, u_pos_after);
+
+            delete[] h_u_pos;
+            delete[] alpha_after;
+            delete[] u_pos_after;
+
+
+#pragma omp parallel for
             for (long ind = 0; ind < ncoeff; ind++) {
                 delta_tmp[ind][0] = delta_tmp[ind][0] * fftFactor - alpha_tmp[ind];
                 delta_tmp[ind][1] = 0;
             }
         }else{
-            #pragma omp parallel for
+#pragma omp parallel for
             for (long ind = 0; ind < ncoeff; ind++) {
                 delta_tmp[ind][0] *= fftFactor;
                 delta_tmp[ind][1] = 0;
@@ -370,8 +398,15 @@ void density_reconstruction::run_main_iteration(long int niter, bool debias)
           alpha_tmp[ind] = alpha_u[ind] + sig * alpha_tmp[ind];
         }
 
+        // Read in the single stepping data. Re-ingest alpha, as some arrays are not initialized
+        read_float_data(std::string("alpha_i") + dot_ext, alpha_tmp, nwavcoeff);
+        float* h_u = new float[nwavcoeff];
+        read_float_data(std::string("u_i") + dot_ext, h_u, nwavcoeff);
+
 #ifdef CUDA_ACC
-        prox->prox_l1(alpha_tmp,1000);
+        prox->inject_u(h_u);
+        prox->prox_l1(alpha_tmp,1000, iter == niter/2);
+        prox->extract_u(h_u);
 #else
         // TODO: Implement CPU prox operator
 #endif
@@ -562,18 +597,18 @@ void density_reconstruction::reconstruct()
     std::cout << "Running main iteration" << std::endl;
     run_main_iteration(nRecIter);
 
-    // Reweighted l1 loop
-    for (int i = 0; i < nreweights ; i++) {
-            f->update_covariance(delta);
-            compute_thresholds(nrandom / 2);
-            compute_weights();
-            run_main_iteration(nRecIter / 2);
-        }
+    // Reweighted l1 loop: don't run it
+//    for (int i = 0; i < nreweights ; i++) {
+//            f->update_covariance(delta);
+//            compute_thresholds(nrandom / 2);
+//            compute_weights();
+//            run_main_iteration(nRecIter / 2);
+//        }
 
-    std::cout  << "Starting debiasing " << std::endl;
-    // Final debiasing step
-    f->update_covariance(delta);
-    run_main_iteration(nRecIterDebias, true);
+//    std::cout  << "Starting debiasing " << std::endl;
+    // Final debiasing step: don't run this either
+//    f->update_covariance(delta);
+//    run_main_iteration(nRecIterDebias, true);
 }
 
 void density_reconstruction::compute_thresholds(int niter)
@@ -705,4 +740,13 @@ void density_reconstruction::get_density_map(double *d)
 
         }
     }
+}
+
+// Read size float values from filename into array
+void read_float_data(std::string filename, float *array, int size)
+{
+    std::ifstream instream;
+    instream.open(filename, std::ios_base::binary | std::ios_base::in);
+    instream.read(reinterpret_cast<char*> (array), size * sizeof(float));
+    instream.close();
 }
